@@ -22,6 +22,21 @@ static size_t stream_read_(struct Stream_s *stream, void *ptr, size_t size, size
 	return nmemb;
 }
 
+static size_t stream_write_(struct Stream_s *stream, const void *ptr, size_t size, size_t nmemb)
+{
+	StreamBuffer *sd = (StreamBuffer *)stream->ctx;
+	size_t nb = size * nmemb;
+	if(sd->offset + nb > sd->length)
+	{
+		/* printf("overflow offset:%d,nb:%d,length:%d,size:%d,nmemb:%d\n",sd->offset,nb,sd->length,size,nmemb); */
+		return 0; // EOF
+	}
+	memcpy(&sd->buffer[sd->offset], ptr, nb);
+	/* printf("writing %d (%d/%d)\n", nb, sd->offset, sd->length); */
+	sd->offset += nb;
+	return nmemb;
+}
+
 static int stream_eof_(struct Stream_s *stream)
 {
 	StreamBuffer *sd = (StreamBuffer *)stream->ctx;
@@ -73,6 +88,7 @@ int init_stream_from_buffer(Stream *s, StreamBuffer *sb, unsigned char *buffer, 
 	
 	s->ctx = sb;
 	s->read = stream_read_;
+	s->write = stream_write_;
 	s->eof = stream_eof_;
 	s->name = stream_name_;
 	s->tell = stream_tell_;

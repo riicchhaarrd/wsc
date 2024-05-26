@@ -35,6 +35,7 @@ typedef struct Stream_s
 	int (*name)(struct Stream_s *stream, char *buffer, size_t size);
 	int (*eof)(struct Stream_s *stream);
 	size_t (*read)(struct Stream_s *stream, void *ptr, size_t size, size_t nmemb);
+	size_t (*write)(struct Stream_s *stream, const void *ptr, size_t size, size_t nmemb);
 	/* void (*close)(struct Stream_s *stream); */
 } Stream;
 
@@ -136,6 +137,32 @@ int stream_read_string(Stream *s, char *string, size_t max_string_length, uint64
 
 // We're assuming we're always running this on a little endian system.
 
+void stream_write_u8(Stream *s, uint8_t i)
+{
+	s->write(s, &i, 1, 1);
+}
+void stream_write_u16be(Stream *s, uint16_t i)
+{
+	uint8_t bytes[2];
+	bytes[0] = i & 0xff;
+	bytes[1] = (i >> 8) & 0xff;
+	s->write(s, bytes, 1, sizeof(bytes));
+}
+void stream_write_u64be(Stream *s, uint64_t i)
+{
+	uint8_t bytes[8];
+	union
+	{
+		uint64_t i;
+		uint8_t b[8];
+	} u;
+	u.i = i;
+	for(size_t k = 0; k < 8; ++k)
+	{
+		bytes[7 - k] = u.b[k];
+	}
+	s->write(s, bytes, 1, sizeof(bytes));
+}
 uint16_t stream_read_u16be(Stream *s)
 {
 	uint8_t bytes[2];

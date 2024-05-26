@@ -64,6 +64,49 @@ void handle_handshake(int client_fd)
 	}
 }
 
+void send_websocket_frame(int fd, const void *data, size_t length)
+{
+	char buffer[16384];
+	Stream s = { 0 };
+	StreamBuffer sb = { 0 };
+	init_stream_from_buffer(&s, &sb, buffer, sizeof(buffer));
+
+	uint8_t flags = 0;
+	// TODO: allow fragmented and text frame types
+	flags = 2; // set data type binary
+	flags |= 0x80; // set FIN bit
+
+	uint8_t masked = 0;
+	 // set masked bit (only if we're a client) */
+	/* masked = 0x80; */
+	
+	stream_write_u8(&s, flags);
+
+	if(length < 126)
+	{
+		stream_write_u8(&s, length | masked);
+	}
+	else if(length < 0xffff)
+	{
+		stream_write_u8(&s, 126 | masked);
+		stream_write_u16be(&s, length);
+	}
+	else
+	{
+		stream_write_u8(&s, 127 | masked);
+		stream_write_u64be(&s, length);
+	}
+	// Add masking key if we're a client
+
+	if(0 == s.write(&s, data, 1, length))
+	{
+		printf("Data length would overflow outgoing buffer\n");
+		return;
+	}
+
+	send(fd, buffer, s.tell(&s), 0);
+}
+
 void handle_websocket_frame(int fd, char *buf, size_t n, uint8_t opcode)
 {
 	printf("handle\n");
