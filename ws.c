@@ -10,11 +10,7 @@
 #include "stream.h"
 #include "stream_buffer.h"
 #include "base64.h"
-
-#include <openssl/sha.h>
-#include <openssl/buffer.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
+#include "sha1.h"
 
 static int server_fd;
 static struct sockaddr_in sa;
@@ -51,17 +47,11 @@ void handle_handshake(int client_fd)
 			stream_read_string(&ls, nonce, sizeof(nonce), NULL);
 			char concatenated[256];
 			snprintf(concatenated, sizeof(concatenated), "%s%s", nonce, WEBSOCKET_KEY_MAGIC_STRING);
-			unsigned char obuf[SHA_DIGEST_LENGTH];
-			SHA1((unsigned char *)concatenated, strlen(concatenated), obuf);
-			/* char sha1hash[SHA_DIGEST_LENGTH * 2] = {0}; */
-			/* for(int k = 0; k < SHA_DIGEST_LENGTH; ++k) */
-			/* { */
-			/* 	snprintf(&sha1hash[k * 2], sizeof(sha1hash), "%02x", obuf[k]); */
-			/* } */
-			/* printf("sha1: %s\n", sha1hash); */
+			char digest[SHA_DIGEST_LENGTH];
+			SHA1(digest, (const char *)concatenated, strlen(concatenated));
 
 			char encoded[2048]; // Should be enough
-			base64_encode(obuf, SHA_DIGEST_LENGTH, encoded, sizeof(encoded));
+			base64_encode((const unsigned char*)digest, SHA_DIGEST_LENGTH, encoded, sizeof(encoded));
 			
 			char response[2048] = { 0 };
 			snprintf(response,

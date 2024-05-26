@@ -1,2 +1,2 @@
 #!/bin/bash
-gcc -o wsc ws.c -lssl -lcrypto
+gcc -o wsc ws.c sha1.c
