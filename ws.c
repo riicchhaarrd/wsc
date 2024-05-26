@@ -9,6 +9,7 @@
 #include <time.h>
 #include "stream.h"
 #include "stream_buffer.h"
+#include "base64.h"
 
 #include <openssl/sha.h>
 #include <openssl/buffer.h>
@@ -18,25 +19,6 @@
 static int server_fd;
 static struct sockaddr_in sa;
 #define HTTP_PORT (8080)
-
-// https://stackoverflow.com/a/16511093
-char *base64encode(const void *b64_encode_this, int encode_this_many_bytes)
-{
-	BIO *b64_bio, *mem_bio;							// Declares two OpenSSL BIOs: a base64 filter and a memory BIO.
-	BUF_MEM *mem_bio_mem_ptr;						// Pointer to a "memory BIO" structure holding our base64 data.
-	b64_bio = BIO_new(BIO_f_base64());				// Initialize our base64 filter BIO.
-	mem_bio = BIO_new(BIO_s_mem());					// Initialize our memory sink BIO.
-	BIO_push(b64_bio, mem_bio);						// Link the BIOs by creating a filter-sink BIO chain.
-	BIO_set_flags(b64_bio, BIO_FLAGS_BASE64_NO_NL); // No newlines every 64 characters or less.
-	BIO_write(b64_bio, b64_encode_this, encode_this_many_bytes); // Records base64 encoded data.
-	BIO_flush(b64_bio);							// Flush data.  Necessary for b64 encoding, because of pad characters.
-	BIO_get_mem_ptr(mem_bio, &mem_bio_mem_ptr); // Store address of mem_bio's memory structure.
-	BIO_set_close(mem_bio, BIO_NOCLOSE);		// Permit access to mem_ptr after BIOs are destroyed.
-	BIO_free_all(b64_bio);						// Destroys all BIOs in chain, starting with b64 (i.e. the 1st one).
-	BUF_MEM_grow(mem_bio_mem_ptr, (*mem_bio_mem_ptr).length + 1); // Makes space for end null.
-	(*mem_bio_mem_ptr).data[(*mem_bio_mem_ptr).length] = '\0';	  // Adds null-terminator to tail.
-	return (*mem_bio_mem_ptr).data; // Returns base-64 encoded data. (See: "buf_mem_st" struct).
-}
 
 #define WEBSOCKET_KEY_MAGIC_STRING "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -77,14 +59,16 @@ void handle_handshake(int client_fd)
 			/* 	snprintf(&sha1hash[k * 2], sizeof(sha1hash), "%02x", obuf[k]); */
 			/* } */
 			/* printf("sha1: %s\n", sha1hash); */
-			char *encoded = base64encode(obuf, SHA_DIGEST_LENGTH);
+
+			char encoded[2048]; // Should be enough
+			base64_encode(obuf, SHA_DIGEST_LENGTH, encoded, sizeof(encoded));
+			
 			char response[2048] = { 0 };
 			snprintf(response,
 					 sizeof(response),
 					 "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: "
 					 "Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n",
 					 encoded);
-			free(encoded);
 			send(client_fd, response, strlen(response), 0);
 		}
 	}
